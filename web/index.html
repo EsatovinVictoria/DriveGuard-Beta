@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DriveGuard — Computer Vision Experiment</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="logo-area">
+        <span class="logo-badge">CV-M12/M13</span>
+        <h1>DriveGuard <span>Experimental Pipeline</span></h1>
+        <p class="subtitle">Bakheet &amp; Al-Hamadi (Brain Sciences 2021) — Improved HOG Feature Prototype</p>
+      </div>
+      <div class="header-status">
+        <div id="backend-status" class="status-indicator status-connecting">
+          <span class="status-dot"></span>
+          <span id="backend-status-text">Connecting...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container">
+
+    <!-- ==================== 1. DATASET SECTION ==================== -->
+    <section class="card dataset-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="step-num">1</span>
+          <h2>NTHU-DDD Dataset Overview</h2>
+        </div>
+        <button id="btn-scan-dataset" class="btn btn-secondary btn-sm">Rescan Dataset</button>
+      </div>
+      <div class="dataset-stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Dataset Root</span>
+          <span id="stat-root" class="stat-value mono" title="...">Scanning...</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Total Samples</span>
+          <span id="stat-total" class="stat-value">0</span>
+        </div>
+        <div class="stat-box stat-drowsy">
+          <span class="stat-label">Drowsy Class (1)</span>
+          <span id="stat-drowsy" class="stat-value">0</span>
+        </div>
+        <div class="stat-box stat-notdrowsy">
+          <span class="stat-label">Not Drowsy Class (0)</span>
+          <span id="stat-notdrowsy" class="stat-value">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Unique Subjects</span>
+          <span id="stat-subjects" class="stat-value">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. INPUT SELECTION SECTION ==================== -->
+    <section class="card input-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="step-num">2</span>
+          <h2>Image Input &amp; Ground Truth</h2>
+        </div>
+        <div class="badge-groundtruth">
+          <span class="gt-label">Ground Truth Label:</span>
+          <span id="gt-badge" class="badge-neutral">No Sample Loaded</span>
+        </div>
+      </div>
+
+      <div class="input-controls-grid">
+        <div class="control-col">
+          <label class="input-label" for="sample-select">Select From NTHU-DDD Dataset:</label>
+          <div class="select-wrapper">
+            <select id="sample-select" class="form-control">
+              <option value="">-- Choose sample --</option>
+            </select>
+            <button id="btn-load-sample" class="btn btn-primary">Load Sample</button>
+          </div>
+          <p class="input-hint">Metadata parsed: Subject ID, video scenario, and ground-truth folder label.</p>
+        </div>
+
+        <div class="control-col">
+          <label class="input-label" for="file-upload">Or Upload Custom Frame:</label>
+          <div class="upload-wrapper">
+            <input type="file" id="file-upload" accept="image/jpeg,image/png,image/bmp" class="form-control-file">
+          </div>
+          <p class="input-hint">Formats: .jpg, .png, .bmp (Standard 640x480 recommended).</p>
+        </div>
+      </div>
+
+      <!-- Action Toolbar -->
+      <div class="action-bar">
+        <div class="action-left">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-manual-roi">
+            <span>Manual Eye ROI Mode (Canvas Selection)</span>
+          </label>
+          <span class="provenance-pill pill-approx">ASM Replacement: Canvas / Haar</span>
+        </div>
+        <div class="action-buttons">
+          <button id="btn-process" class="btn btn-accent" disabled>Execute Pipeline</button>
+          <button id="btn-reset" class="btn btn-secondary">Reset</button>
+        </div>
+      </div>
+
+      <!-- Manual ROI Canvas Instructions (Hidden by default) -->
+      <div id="manual-roi-panel" class="manual-roi-panel hidden">
+        <div class="roi-help">
+          <p><strong>Manual Eye ROI Mode:</strong> Drag a bounding box around the driver's eyes on the face preview below. This bypasses automated eye localization for pure Improved HOG testing without detector bias.</p>
+          <div class="roi-coords">
+            Coordinates: X: <span id="roi-x" class="mono">-</span>, Y: <span id="roi-y" class="mono">-</span>, W: <span id="roi-w" class="mono">-</span>, H: <span id="roi-h" class="mono">-</span>
+            <button id="btn-clear-roi" class="btn btn-sm btn-outline">Clear Box</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. PROCESSING PIPELINE STAGES ==================== -->
+    <section class="card pipeline-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="step-num">3</span>
+          <h2>Computer Vision Pipeline Stages</h2>
+        </div>
+        <div id="pipeline-time-badge" class="time-badge hidden">
+          Processing Time: <span id="pipeline-ms" class="mono">0</span> ms
+        </div>
+      </div>
+
+      <div class="pipeline-stages-grid">
+        <!-- Stage 1: Original -->
+        <div class="stage-box">
+          <div class="stage-header">
+            <h4>1. Original Image</h4>
+            <span class="provenance-pill pill-exact">Input</span>
+          </div>
+          <div class="image-preview-container" id="container-original">
+            <img id="img-original" alt="Original" class="preview-img">
+            <canvas id="canvas-roi" class="overlay-canvas"></canvas>
+            <div class="placeholder-text">Awaiting input...</div>
+          </div>
+          <div class="stage-meta" id="meta-original">Resolution: -</div>
+        </div>
+
+        <!-- Stage 2: Gaussian Blur -->
+        <div class="stage-box">
+          <div class="stage-header">
+            <h4>2. Gaussian Blur</h4>
+            <span class="provenance-pill pill-exact">Exact (3x3, &sigma;=0.5)</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-gaussian" alt="Gaussian Blur" class="preview-img">
+            <div class="placeholder-text">-</div>
+          </div>
+          <div class="stage-meta">Noise suppression (Section 2.1)</div>
+        </div>
+
+        <!-- Stage 3: CLAHE -->
+        <div class="stage-box">
+          <div class="stage-header">
+            <h4>3. Channel CLAHE</h4>
+            <span class="provenance-pill pill-exact">Independent Channels</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-clahe" alt="CLAHE" class="preview-img">
+            <div class="placeholder-text">-</div>
+          </div>
+          <div class="stage-meta">Lighting compensation (clipLimit=2.0)</div>
+        </div>
+
+        <!-- Stage 4: Face Detection -->
+        <div class="stage-box">
+          <div class="stage-header">
+            <h4>4. Face Detection</h4>
+            <span class="provenance-pill pill-approx">Haar Approx</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-face" alt="Face Detection" class="preview-img">
+            <div class="placeholder-text">-</div>
+          </div>
+          <div class="stage-meta" id="meta-face">AdaBoost cascade substitute</div>
+        </div>
+
+        <!-- Stage 5: Eye Localization -->
+        <div class="stage-box">
+          <div class="stage-header">
+            <h4>5. Eye Localization</h4>
+            <span class="provenance-pill pill-approx" id="pill-eye-mode">Haar / Anthro</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-eye" alt="Eye Localization" class="preview-img">
+            <div class="placeholder-text">-</div>
+          </div>
+          <div class="stage-meta" id="meta-eye">ASM replacement status</div>
+        </div>
+
+        <!-- Stage 6: Eye ROI -->
+        <div class="stage-box">
+          <div class="stage-header">
+            <h4>6. Eye ROI (Standardized)</h4>
+            <span class="provenance-pill pill-assump">3x8 cells (24x64)</span>
+          </div>
+          <div class="image-preview-container roi-container">
+            <img id="img-roi" alt="Eye ROI" class="preview-img pixelated">
+            <div class="placeholder-text">-</div>
+          </div>
+          <div class="stage-meta" id="meta-roi">Grid: Divisible by 8x8 cells</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. IMPROVED HOG SECTION ==================== -->
+    <section class="card hog-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="step-num">4</span>
+          <h2>Improved HOG Feature Extraction (Section 2.3)</h2>
+        </div>
+        <div class="card-actions">
+          <span class="provenance-pill pill-exact">Shifted Orientations (Eq. 1-5)</span>
+        </div>
+      </div>
+
+      <div class="hog-visuals-grid">
+        <!-- Visual 1: Gradient Magnitude -->
+        <div class="hog-panel">
+          <div class="panel-header">
+            <h4>A. Gradient Magnitude &rho;(x, y)</h4>
+            <span class="code-tag">Kernel [-1, 0, 1]</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-hog-mag" alt="Gradient Magnitude" class="preview-img pixelated">
+            <div class="placeholder-text">Awaiting pipeline...</div>
+          </div>
+          <p class="panel-caption">1D centered discrete derivative mask magnitude.</p>
+        </div>
+
+        <!-- Visual 2: Gradient Orientation -->
+        <div class="hog-panel">
+          <div class="panel-header">
+            <h4>B. Gradient Orientation &gamma;(x, y)</h4>
+            <span class="code-tag">Unsigned [0, &pi;)</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-hog-ori" alt="Gradient Orientation" class="preview-img pixelated">
+            <div class="placeholder-text">Awaiting pipeline...</div>
+          </div>
+          <p class="panel-caption">Color encoded: Hue represents orientation angle, Value represents magnitude.</p>
+        </div>
+
+        <!-- Visual 3: Shifted Histograms Grid -->
+        <div class="hog-panel">
+          <div class="panel-header">
+            <h4>C. Shifted Histograms</h4>
+            <span class="code-tag">&epsilon; &isin; {0, ..., 7}</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-hog-shifted" alt="Shifted Histograms" class="preview-img pixelated">
+            <div class="placeholder-text">Awaiting pipeline...</div>
+          </div>
+          <p class="panel-caption">8 cyclic orientation shifts applied to each 8-bin cell histogram (Paper Figure 6).</p>
+        </div>
+
+        <!-- Visual 4: Binary Comparison Raster -->
+        <div class="hog-panel">
+          <div class="panel-header">
+            <h4>D. Cell Pair Binarization Matrix</h4>
+            <span class="code-tag">b_{c1, c2}(k, &epsilon;)</span>
+          </div>
+          <div class="image-preview-container">
+            <img id="img-hog-binary" alt="Binary Matrix" class="preview-img pixelated">
+            <div class="placeholder-text">Awaiting pipeline...</div>
+          </div>
+          <p class="panel-caption">Binarized comparison matrix: White=1, Black=0 (Equation 5).</p>
+        </div>
+      </div>
+
+      <!-- Feature Vector 1D Barcode Plot -->
+      <div class="feature-vector-panel">
+        <div class="panel-header">
+          <h4>E. Final Improved HOG Descriptor Vector (Figure 7b Visualization)</h4>
+          <span id="vector-dim-badge" class="code-tag mono">Dimension: 0</span>
+        </div>
+        <div class="vector-plot-container">
+          <img id="img-hog-barcode" alt="HOG Vector Barcode" class="vector-img">
+        </div>
+        <div class="vector-details">
+          <div class="detail-row">
+            <span>Feature Dimension: <strong id="val-feat-dim" class="mono">0</strong> bits</span>
+            <span>Overlapping 2x2 Blocks: <strong id="val-num-blocks" class="mono">0</strong></span>
+            <span>Cells: <strong class="mono">8x8 px</strong></span>
+            <span>Orientation Bins: <strong class="mono">8</strong></span>
+            <span>Shifts (&epsilon;): <strong class="mono">8 (0..7)</strong></span>
+          </div>
+          <div class="detail-row snippet-row">
+            <span class="snippet-label">Vector Sample (First 64 bits):</span>
+            <code id="val-vector-snippet" class="mono-code">-</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 5. FEATURE EXPORT SECTION ==================== -->
+    <section class="card export-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="step-num">5</span>
+          <h2>Feature Export for Na&iuml;ve Bayes Model Handoff</h2>
+        </div>
+        <div class="export-actions">
+          <button id="btn-export-csv" class="btn btn-success">Export Current &amp; Batch to CSV</button>
+        </div>
+      </div>
+      <p class="export-desc">
+        This export writes ground truth folder labels and exact binary Improved HOG feature vectors to
+        <code>outputs/features/hog_features.csv</code> for Raditya's Na&iuml;ve Bayesian classifier module.
+        No machine learning predictions or neural heuristics are applied here.
+      </p>
+      <div id="export-status-box" class="export-status-box hidden">
+        <p id="export-msg" class="mono"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-content">
+      <p>DriveGuard — Real-Time Driver Drowsiness Detection System | Experimental M12-M13 Prototype</p>
+      <p class="provenance-note">Implementation based strictly on Bakheet &amp; Al-Hamadi (Brain Sciences 2021). All approximations explicitly documented.</p>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

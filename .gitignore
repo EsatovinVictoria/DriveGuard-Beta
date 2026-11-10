@@ -1,0 +1,33 @@
+# Python environment
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Output artifacts
+outputs/preprocessed/*
+outputs/face_detection/*
+outputs/eye_roi/*
+outputs/hog_visualization/*
+outputs/features/*
+outputs/reports/*
+!outputs/**/.gitkeep
+
+# Dataset (NTHU-DDD is large academic dataset - must not be pushed to public git)
+dataset/
+NTHU-DDD/
+*.avi
+*.mp4
+
+# Temp / Scratch
+tmp/
+temp/
